@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from suppliers import CATALOG_SEED, SEED_PRODUCTS, SEED_SUPPLIERS, SUPPLIER_MAP
+from suppliers import CATALOG_SEED, SEED_PRODUCTS, SEED_SUPPLIERS
 
 VOLUMES_ML = [1, 2, 3, 5, 10]
 
@@ -20,7 +20,7 @@ def price_for_volume(base_price_per_ml: float, volume_ml: int) -> int:
     return int(round(base_price_per_ml * mult))
 
 
-def enrich_product(product: dict) -> dict:
+def enrich_product(product: dict, supplier: dict | None = None) -> dict:
     p = dict(product)
     p["volumes"] = [
         {
@@ -32,14 +32,12 @@ def enrich_product(product: dict) -> dict:
     stock = int(p.get("stock_ml", 0))
     p["stock_ml"] = stock
     p["in_stock"] = stock > 0
-    sid = p.get("supplier_id")
-    if sid and sid in SUPPLIER_MAP:
-        s = SUPPLIER_MAP[sid]
+    if supplier:
         p["supplier"] = {
-            "id": s["id"],
-            "name": s["name"],
-            "country": s["country"],
-            "has_certificate": s["has_quality_certificate"],
-            "honest_sign": s["honest_sign"],
+            "id": supplier["id"],
+            "name": supplier["name"],
+            "country": supplier.get("country", ""),
+            "has_certificate": supplier.get("has_quality_certificate"),
+            "honest_sign": supplier.get("honest_sign"),
         }
     return p

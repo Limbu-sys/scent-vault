@@ -20,12 +20,17 @@
     <div id="adminPanel" class="hidden">
       <nav class="admin-tabs">
         <button type="button" class="admin-tabs__btn admin-tabs__btn--active" data-tab="products">Товары</button>
+        <button type="button" class="admin-tabs__btn" data-tab="suppliers">Поставщики</button>
         <button type="button" class="admin-tabs__btn" data-tab="orders">Заказы</button>
         <button type="button" class="admin-tabs__btn" data-tab="admins">Админы</button>
       </nav>
       <section class="admin-section" id="tab-products">
         <button type="button" class="btn btn--primary btn--full" id="newProductBtn">+ Новый товар</button>
         <div class="admin-list" id="productList"></div>
+      </section>
+      <section class="admin-section hidden" id="tab-suppliers">
+        <button type="button" class="btn btn--primary btn--full" id="newSupplierBtn">+ Новый поставщик</button>
+        <div class="admin-list" id="supplierList"></div>
       </section>
       <section class="admin-section hidden" id="tab-orders">
         <select id="orderStatusFilter" class="field-input" style="margin-bottom:12px">
@@ -56,8 +61,12 @@
         <h2 id="modalTitle">Товар</h2>
         <input type="hidden" id="editProductId">
         <p class="admin-sku hidden" id="skuDisplay"></p>
+        <label class="field"><span>Поставщик</span>
+          <select id="fSupplier" class="field-input"><option value="">— не выбран —</option></select>
+        </label>
         <label class="field"><span>Бренд</span><input type="text" id="fBrand" required class="field-input"></label>
         <label class="field"><span>Название</span><input type="text" id="fName" required class="field-input"></label>
+        <label class="field"><span>Семейство аромата</span><input type="text" id="fFamily" class="field-input" placeholder="Цветочные, восточные…"></label>
         <label class="field"><span>Описание</span><textarea id="fDesc" class="field-input" rows="2"></textarea></label>
         <label class="field"><span>Пол</span>
           <select id="fGender" class="field-input">
@@ -92,6 +101,34 @@
         <label class="field"><span><input type="checkbox" id="fActive" checked> В продаже</span></label>
         <div class="admin-modal__actions">
           <button type="button" class="btn btn--ghost" id="modalCancel">Отмена</button>
+          <button type="submit" class="btn btn--primary">Сохранить</button>
+        </div>
+      </form>
+    </dialog>
+    <dialog class="admin-modal" id="supplierModal">
+      <form id="supplierForm" class="admin-modal__inner">
+        <h2 id="supplierModalTitle">Поставщик</h2>
+        <input type="hidden" id="editSupplierId">
+        <label class="field"><span>Компания / имя</span><input type="text" id="sName" required class="field-input"></label>
+        <label class="field"><span>Контактное лицо</span><input type="text" id="sPerson" class="field-input"></label>
+        <label class="field"><span>Телефон</span><input type="tel" id="sPhone" class="field-input" placeholder="+7…"></label>
+        <label class="field"><span>Telegram</span><input type="text" id="sTelegram" class="field-input" placeholder="@username"></label>
+        <label class="field"><span>WhatsApp</span><input type="tel" id="sWhatsapp" class="field-input"></label>
+        <label class="field"><span>Email</span><input type="email" id="sEmail" class="field-input"></label>
+        <label class="field"><span>Сайт</span><input type="url" id="sWebsite" class="field-input"></label>
+        <label class="field"><span>Страна</span><input type="text" id="sCountry" class="field-input" placeholder="Швейцария / ОАЭ / РФ"></label>
+        <label class="field"><span>Город / регион</span><input type="text" id="sRegion" class="field-input"></label>
+        <label class="field"><span>Адрес</span><input type="text" id="sAddress" class="field-input"></label>
+        <label class="field"><span>ИНН (если есть)</span><input type="text" id="sInn" class="field-input"></label>
+        <label class="field"><span>Происхождение сырья</span><input type="text" id="sOrigin" class="field-input" placeholder="Масляный концентрат, завод…"></label>
+        <label class="field"><span>Сертификат</span><input type="text" id="sCert" class="field-input" placeholder="COA, ISO…"></label>
+        <label class="field"><span>Какие ароматы поставляет</span><textarea id="sFragrances" class="field-input" rows="2"></textarea></label>
+        <label class="field"><span>Заметки</span><textarea id="sNotes" class="field-input" rows="2"></textarea></label>
+        <label class="field"><span><input type="checkbox" id="sCertOk"> Есть сертификат качества</span></label>
+        <label class="field"><span><input type="checkbox" id="sHonestSign"> Работает с «Честным знаком»</span></label>
+        <label class="field"><span><input type="checkbox" id="sActive" checked> Активен</span></label>
+        <div class="admin-modal__actions">
+          <button type="button" class="btn btn--ghost" id="supplierModalCancel">Отмена</button>
           <button type="submit" class="btn btn--primary">Сохранить</button>
         </div>
       </form>

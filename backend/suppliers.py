@@ -1,50 +1,21 @@
-"""Поставщики масляных концентратов и каталог «по мотивам» оригиналов."""
+"""Каталог ароматов «по мотивам» — без вымышленных поставщиков.
+
+Реальных поставщиков добавляйте в админке: Поставщики → + Новый.
+"""
 
 from __future__ import annotations
 
-CATALOG_SEED_VERSION = 2
+CATALOG_SEED_VERSION = 3
 
-SEED_SUPPLIERS = [
-    {
-        "id": "supplier-ch",
-        "name": "Swiss Aroma Labs",
-        "country": "Швейцария",
-        "region": "Geneva",
-        "origin_type": "oil_concentrate",
-        "origin_note": "Масляный концентрат с заводов-производителей, Швейцария",
-        "has_quality_certificate": True,
-        "certificate_label": "ISO 22716 / COA на партию",
-        "honest_sign": True,
-        "honest_sign_note": "Маркировка «Честный знак» на флаконах для розлива",
-        "contact_email": "dvetochkiinfo@gmail.com",
-        "active": True,
-    },
-    {
-        "id": "supplier-ae",
-        "name": "Gulf Essence Trading",
-        "country": "ОАЭ",
-        "region": "Dubai",
-        "origin_type": "oil_concentrate",
-        "origin_note": "Масляный концентрат с заводов-производителей, ОАЭ",
-        "has_quality_certificate": True,
-        "certificate_label": "GCC conformity / сертификат происхождения",
-        "honest_sign": True,
-        "honest_sign_note": "Маркировка «Честный знак» на флаконах для розлива",
-        "contact_email": "dvetochkiinfo@gmail.com",
-        "active": True,
-    },
-]
-
-SUPPLIER_CH = "supplier-ch"
-SUPPLIER_AE = "supplier-ae"
+# Реальных поставщиков в коде нет — только через админку / API
+SEED_SUPPLIERS: list[dict] = []
 
 
-def _desc(brand: str, name: str, family: str, supplier_id: str) -> str:
-    origin = "Швейцария" if supplier_id == SUPPLIER_CH else "ОАЭ"
+def _desc(brand: str, name: str, family: str) -> str:
     return (
         f"По мотивам {brand} {name}. {family}. "
-        f"Масляный концентрат (завод-производитель, {origin}) — высокое сходство и стойкость. "
-        "Поставщик с сертификатом качества, розлив с маркировкой «Честный знак»."
+        "Масляный концентрат с заводов-производителей (Швейцария / ОАЭ). "
+        "Поставщик с сертификатом и маркировкой «Честный знак» — указывается после привязки."
     )
 
 
@@ -54,7 +25,6 @@ def _item(
     name: str,
     gender: str,
     family: str,
-    supplier_id: str,
     price: int,
     notes: list[str],
     *,
@@ -69,13 +39,13 @@ def _item(
         "name": name,
         "gender": gender,
         "fragrance_family": family,
-        "supplier_id": supplier_id,
+        "supplier_id": None,
         "notes": notes,
         "concentration": concentration,
         "base_price_per_ml": price,
         "badge": badge,
         "gradient": gradient or ["#3d2914", "#8b5a2b"],
-        "description": _desc(brand, name, family, supplier_id),
+        "description": _desc(brand, name, family),
         "stock_ml": stock_ml,
         "active": True,
         "reference_brand": brand,
@@ -85,102 +55,80 @@ def _item(
 
 CATALOG_SEED: list[dict] = [
     _item("attar-musk-kashmir", "Attar Collection", "Musk Kashmir", "unisex",
-          "Цветочные, древесно-мускусные", SUPPLIER_AE, 480,
-          ["мускус", "кашмир", "цветы", "древесина"]),
+          "Цветочные, древесно-мускусные", 480, ["мускус", "кашмир", "цветы", "древесина"]),
     _item("amouage-guidance", "Amouage", "Guidance", "unisex",
-          "Цветочные, фруктовые", SUPPLIER_AE, 620,
-          ["фрукты", "цветы", "амбра"], badge="premium", gradient=["#1a3a2a", "#c9a962"]),
+          "Цветочные, фруктовые", 620, ["фрукты", "цветы", "амбра"],
+          badge="premium", gradient=["#1a3a2a", "#c9a962"]),
     _item("ajmal-amber-wood", "Ajmal", "Amber Wood", "unisex",
-          "Восточные, древесные", SUPPLIER_AE, 380,
-          ["амбра", "древесина", "специи"]),
+          "Восточные, древесные", 380, ["амбра", "древесина", "специи"]),
     _item("byredo-bal-dafrique", "Byredo", "Bal d'Afrique", "unisex",
-          "Восточные, древесные", SUPPLIER_CH, 520,
-          ["бергамот", "фиалка", "ветiver"]),
+          "Восточные, древесные", 520, ["бергамот", "фиалка", "ветiver"]),
     _item("byredo-gypsy-water", "Byredo", "Gypsy Water", "unisex",
-          "Древесные, фужерные", SUPPLIER_CH, 540,
-          ["можжевельник", "лаадан", "ваниль"], badge="bestseller"),
+          "Древесные, фужерные", 540, ["можжевельник", "лаадан", "ваниль"], badge="bestseller"),
     _item("clive-blonde-amber", "Clive Christian", "Blonde Amber", "unisex",
-          "Амбровые", SUPPLIER_CH, 780,
-          ["амбра", "белые цветы", "ваниль"], badge="premium", gradient=["#d4af37", "#3d2914"]),
+          "Амбровые", 780, ["амбра", "белые цветы", "ваниль"],
+          badge="premium", gradient=["#d4af37", "#3d2914"]),
     _item("clive-matsukita", "Clive Christian", "Matsukita", "unisex",
-          "Древесные, шипровые", SUPPLIER_CH, 760,
-          ["шипр", "зелень", "древесина"], badge="premium"),
+          "Древесные, шипровые", 760, ["шипр", "зелень", "древесина"], badge="premium"),
     _item("escentric-02", "Escentric Molecules", "Escentric 02", "unisex",
-          "Восточные, цветочные", SUPPLIER_CH, 420,
-          ["амбroxan", "ирис", "роза"]),
+          "Восточные, цветочные", 420, ["амбroxan", "ирис", "роза"]),
     _item("ex-nihilo-narcotique", "Ex Nihilo", "Narcotique Fleur", "unisex",
-          "Цветочные, фруктовые", SUPPLIER_CH, 560,
-          ["нарцисс", "фрукты", "мускус"]),
+          "Цветочные, фруктовые", 560, ["нарцисс", "фрукты", "мускус"]),
     _item("ex-nihilo-blue-talisman", "Ex Nihilo", "Blue Talisman", "unisex",
-          "Цветочные, фруктовые, сладкие", SUPPLIER_CH, 550,
-          ["груша", "жасмин", "сandalwood"]),
+          "Цветочные, фруктовые, сладкие", 550, ["груша", "жасмин", "sandalwood"]),
     _item("jml-wood-sage", "Jo Malone", "Wood Sage & Sea Salt", "unisex",
-          "Фужерные", SUPPLIER_CH, 440,
-          ["шалфей", "морская соль", "амбroxan"]),
+          "Фужерные", 440, ["шалфей", "морская соль", "амбroxan"]),
     _item("mfk-br540-extrait", "Maison Francis Kurkdjian", "Baccarat Rouge 540 Extrait", "unisex",
-          "Восточные, цветочные", SUPPLIER_CH, 820,
-          ["шаfran", "жасмин", "амбра"], badge="icon", gradient=["#c41e3a", "#ffd700"]),
+          "Восточные, цветочные", 820, ["шаfran", "жасмин", "амбра"],
+          badge="icon", gradient=["#c41e3a", "#ffd700"]),
     _item("mab-ganymede", "Marc-Antoine Barrois", "Ganymede", "unisex",
-          "Древесные, пряные", SUPPLIER_CH, 580,
-          ["кожа", "специи", "vetiver"]),
+          "Древесные, пряные", 580, ["кожа", "специи", "vetiver"]),
     _item("nasomatto-black-afgano", "Nasomatto", "Black Afgano", "unisex",
-          "Древесные, фужерные", SUPPLIER_AE, 640,
-          ["каннаbis", "oud", "табак"], badge="premium"),
+          "Древесные, фужерные", 640, ["oud", "табак"], badge="premium"),
     _item("orto-megamare", "Orto Parisi", "Megamare", "unisex",
-          "Фужерные, водяные", SUPPLIER_AE, 600,
-          ["море", "водоросли", "амбroxan"], badge="bestseller"),
+          "Фужерные, водяные", 600, ["море", "водоросли", "амбroxan"], badge="bestseller"),
     _item("pdm-percival", "Parfums de Marly", "Percival", "unisex",
-          "Цитрусовые, фужерные", SUPPLIER_CH, 520,
-          ["бергамот", "лаванда", "мускус"]),
+          "Цитрусовые, фужерные", 520, ["бергамот", "лаванда", "мускус"]),
     _item("pdm-layton", "Parfums de Marly", "Layton", "unisex",
-          "Восточные, цветочные", SUPPLIER_CH, 580,
-          ["яблоко", "ваниль", "гваiac"], badge="bestseller"),
+          "Восточные, цветочные", 580, ["яблоко", "ваниль", "guaiac"], badge="bestseller"),
     _item("tt-kirke", "Tiziana Terenzi", "Kirke", "unisex",
-          "Шипровые, фруктовые", SUPPLIER_AE, 540,
-          ["фрукты", "пачuli", "ваниль"]),
+          "Шипровые, фруктовые", 540, ["фрукты", "пачuli", "ваниль"]),
     _item("tf-lost-cherry", "Tom Ford", "Lost Cherry", "unisex",
-          "Восточные, цветочные", SUPPLIER_AE, 680,
-          ["вишня", "миндаль", "tonka"], badge="icon", gradient=["#8b1a1a", "#e85d5d"]),
+          "Восточные, цветочные", 680, ["вишня", "миндаль", "tonka"],
+          badge="icon", gradient=["#8b1a1a", "#e85d5d"]),
     _item("tf-mandarino-amalfi", "Tom Ford", "Mandarino di Amalfi", "unisex",
-          "Цитрусовые, фужерные", SUPPLIER_AE, 620,
-          ["мандарин", "базилик", "мускус"]),
+          "Цитрусовые, фужерные", 620, ["мандарин", "базилик", "мускус"]),
     _item("vilhelm-dear-polly", "Vilhelm Parfumerie", "Dear Polly", "unisex",
-          "Фужерные", SUPPLIER_CH, 500,
-          ["бергамot", "чай", "vetiver"]),
+          "Фужерные", 500, ["бергamot", "чай", "vetiver"]),
     _item("xerjoff-erba-pura", "Xerjoff", "Erba Pura", "unisex",
-          "Восточные", SUPPLIER_AE, 590,
-          ["фрукты", "мускус", "ваниль"], badge="bestseller", gradient=["#d4a017", "#8b4513"]),
+          "Восточные", 590, ["фрукты", "мускус", "ваниль"],
+          badge="bestseller", gradient=["#d4a017", "#8b4513"]),
     _item("creed-aventus", "Creed", "Aventus", "male",
-          "Шипровые, фруктовые", SUPPLIER_CH, 720,
-          ["анanas", "берёза", "мускус"], badge="icon", gradient=["#2c2c2c", "#c0a060"]),
+          "Шипровые, фруктовые", 720, ["анanas", "берёза", "мускус"],
+          badge="icon", gradient=["#2c2c2c", "#c0a060"]),
     _item("dior-sauvage", "Christian Dior", "Sauvage", "male",
-          "Фужерные", SUPPLIER_CH, 420,
-          ["бергамот", "перец", "амбroxan"], badge="bestseller", gradient=["#1e3a5f", "#4a90d9"]),
+          "Фужерные", 420, ["бергамот", "перец", "амбroxan"],
+          badge="bestseller", gradient=["#1e3a5f", "#4a90d9"]),
     _item("bvlgari-tygar", "Bvlgari", "Tygar", "male",
-          "Цитрусовые, фужерные", SUPPLIER_AE, 580,
-          ["бергamot", "амбroxan", "vetiver"]),
+          "Цитрусовые, фужерные", 580, ["бергamot", "амбroxan", "vetiver"]),
     _item("pdm-altair", "Parfums de Marly", "Althaïr", "male",
-          "Восточные, гурманские", SUPPLIER_CH, 560,
-          ["ваниль", "пряности", "амбра"]),
+          "Восточные, гурманские", 560, ["ваниль", "пряности", "амбра"]),
     _item("shaik-no77", "Shaik", "No. 77", "male",
-          "Восточные", SUPPLIER_AE, 480,
-          ["oud", "кожа", "специи"]),
+          "Восточные", 480, ["oud", "кожа", "специи"]),
     _item("versace-eau-fraiche", "Versace", "Man Eau Fraiche", "male",
-          "Древесные, водяные", SUPPLIER_AE, 340,
-          ["лимон", "кедр", "мускус"]),
+          "Древесные, водяные", 340, ["лимон", "кедр", "мускус"]),
     _item("gucci-gorgeous-gardenia", "Gucci", "Flora Gorgeous Gardenia", "female",
-          "Цветочные, фруктовые", SUPPLIER_AE, 460,
-          ["gardenia", "груша", "жасмин"], gradient=["#f4a6c8", "#d4568a"]),
+          "Цветочные, фруктовые", 460, ["gardenia", "груша", "жасмин"],
+          gradient=["#f4a6c8", "#d4568a"]),
     _item("haute-devils-intrigue", "Haute Fragrance", "Devil's Intrigue", "female",
-          "Цветочные, древесно-мускусные", SUPPLIER_AE, 520,
-          ["роза", "мускус", "древесина"]),
+          "Цветочные, древесно-мускусные", 520, ["роза", "мускус", "древесина"]),
     _item("lancome-tresor-midnight", "Lancome", "Trésor Midnight Rose", "female",
-          "Цветочные, древесно-мускусные", SUPPLIER_CH, 400,
-          ["роза", "малина", "ваниль"]),
+          "Цветочные, древесно-мускусные", 400, ["роза", "малина", "ваниль"]),
     _item("trussardi-donna", "Trussardi", "Donna", "female",
-          "Восточные, цветочные", SUPPLIER_AE, 360,
-          ["жасмин", "фрукты", "пachuli"]),
+          "Восточные, цветочные", 360, ["жасмин", "фрукты", "patchouli"]),
 ]
 
 SEED_PRODUCTS = CATALOG_SEED
-SUPPLIER_MAP = {s["id"]: s for s in SEED_SUPPLIERS}
+
+# Устаревшие ID вымышленных поставщиков — удаляются при миграции
+PLACEHOLDER_SUPPLIER_IDS = ("supplier-ch", "supplier-ae")

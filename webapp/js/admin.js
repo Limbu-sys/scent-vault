@@ -18,6 +18,16 @@ async function api(path, opts = {}) {
 const $ = (s) => document.querySelector(s);
 const toast = $("#toast");
 let products = [];
+let suppliers = [];
+
+function fillSupplierSelect(selected = "") {
+  const sel = $("#fSupplier");
+  if (!sel) return;
+  sel.innerHTML = `<option value="">— не выбран —</option>${suppliers
+    .filter((s) => s.active !== false)
+    .map((s) => `<option value="${s.id}" ${s.id === selected ? "selected" : ""}>${s.name} (${s.country || "?"})</option>`)
+    .join("")}`;
+}
 
 const STATUS_LABELS = {
   pending_payment: "⏳ Ожидает",
@@ -63,7 +73,7 @@ function renderProducts() {
       <div class="admin-item__info">
         <div class="admin-item__sku">${p.sku} ${!p.active ? "· скрыт" : ""}</div>
         <div class="admin-item__title">${p.brand} — ${p.name}</div>
-        <div class="admin-item__meta">${p.concentration} · ${p.base_price_per_ml} ₽/мл · ${p.stock_ml} мл</div>
+        <div class="admin-item__meta">${p.concentration} · ${p.base_price_per_ml} ₽/мл · ${p.stock_ml} мл${p.supplier?.name ? ` · ${p.supplier.name}` : ""}</div>
       </div>
       <div class="admin-item__actions">
         <button type="button" class="btn-edit" data-id="${p.id}">Изм.</button>
@@ -95,7 +105,9 @@ function openModal(create = true, product = null) {
   $("#skuDisplay").textContent = product?.sku ? `Артикул: ${product.sku}` : "";
   $("#fBrand").value = product?.brand || "";
   $("#fName").value = product?.name || "";
+  $("#fFamily").value = product?.fragrance_family || "";
   $("#fDesc").value = product?.description || "";
+  fillSupplierSelect(product?.supplier_id || "");
   $("#fGender").value = product?.gender || "unisex";
   $("#fConc").value = product?.concentration || "EDP";
   $("#fPrice").value = product?.base_price_per_ml || "";
@@ -161,6 +173,8 @@ $("#productForm").addEventListener("submit", async (e) => {
     gradient: [$("#fGrad1").value, $("#fGrad2").value],
     image_url: $("#fImageUrl").value,
     active: $("#fActive").checked,
+    supplier_id: $("#fSupplier").value || null,
+    fragrance_family: $("#fFamily").value.trim(),
   };
   const editId = $("#editProductId").value;
   try {
@@ -179,6 +193,124 @@ $("#productForm").addEventListener("submit", async (e) => {
 
 $("#modalCancel").addEventListener("click", () => $("#productModal").close());
 $("#newProductBtn").addEventListener("click", () => openModal(true));
+
+function renderSuppliers() {
+  const list = $("#supplierList");
+  if (!suppliers.length) {
+    list.innerHTML = "<p class='admin-card__hint'>Добавьте реальных поставщиков с контактами</p>";
+    return;
+  }
+  list.innerHTML = suppliers
+    .map(
+      (s) => `
+    <div class="admin-item">
+      <div class="admin-item__info">
+        <div class="admin-item__title">${s.name}${!s.active ? " · неактивен" : ""}</div>
+        <div class="admin-item__meta">${s.country || ""} ${s.region ? "· " + s.region : ""}</div>
+        <div class="admin-item__meta">${[s.contact_person, s.phone, s.telegram].filter(Boolean).join(" · ")}</div>
+        <div class="admin-item__meta">${s.has_quality_certificate ? "✓ сертификат" : ""} ${s.honest_sign ? "✓ Честный знак" : ""}</div>
+      </div>
+      <div class="admin-item__actions">
+        <button type="button" class="btn-edit" data-sid="${s.id}">Изм.</button>
+        <button type="button" class="btn-del" data-sid="${s.id}">Удал.</button>
+      </div>
+    </div>`
+    )
+    .join("");
+  list.querySelectorAll(".btn-edit").forEach((b) =>
+    b.addEventListener("click", () => openSupplierEdit(b.dataset.sid))
+  );
+  list.querySelectorAll(".btn-del").forEach((b) =>
+    b.addEventListener("click", () => deleteSupplier(b.dataset.sid))
+  );
+}
+
+async function loadSuppliers() {
+  const data = await api("/api/admin/suppliers");
+  suppliers = data.items || [];
+  renderSuppliers();
+  fillSupplierSelect($("#fSupplier")?.value || "");
+}
+
+function openSupplierModal(create = true, s = null) {
+  $("#supplierModalTitle").textContent = create ? "Новый поставщик" : "Редактировать поставщика";
+  $("#editSupplierId").value = s?.id || "";
+  $("#sName").value = s?.name || "";
+  $("#sPerson").value = s?.contact_person || "";
+  $("#sPhone").value = s?.phone || "";
+  $("#sTelegram").value = s?.telegram || "";
+  $("#sWhatsapp").value = s?.whatsapp || "";
+  $("#sEmail").value = s?.contact_email || "";
+  $("#sWebsite").value = s?.website || "";
+  $("#sCountry").value = s?.country || "";
+  $("#sRegion").value = s?.region || "";
+  $("#sAddress").value = s?.address || "";
+  $("#sInn").value = s?.inn || "";
+  $("#sOrigin").value = s?.origin_note || "";
+  $("#sCert").value = s?.certificate_label || "";
+  $("#sFragrances").value = s?.fragrances_offered || "";
+  $("#sNotes").value = s?.notes || "";
+  $("#sCertOk").checked = !!s?.has_quality_certificate;
+  $("#sHonestSign").checked = !!s?.honest_sign;
+  $("#sActive").checked = s?.active !== false;
+  $("#supplierModal").showModal();
+}
+
+function openSupplierEdit(id) {
+  const s = suppliers.find((x) => x.id === id);
+  if (s) openSupplierModal(false, s);
+}
+
+async function deleteSupplier(id) {
+  if (!confirm("Удалить поставщика? Товары останутся без привязки.")) return;
+  try {
+    await api(`/api/admin/suppliers/${id}`, { method: "DELETE" });
+    showToast("Удалено");
+    await loadSuppliers();
+  } catch (e) {
+    showToast(e.message);
+  }
+}
+
+$("#supplierForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const body = {
+    name: $("#sName").value.trim(),
+    contact_person: $("#sPerson").value.trim(),
+    phone: $("#sPhone").value.trim(),
+    telegram: $("#sTelegram").value.trim(),
+    whatsapp: $("#sWhatsapp").value.trim(),
+    contact_email: $("#sEmail").value.trim(),
+    website: $("#sWebsite").value.trim(),
+    country: $("#sCountry").value.trim(),
+    region: $("#sRegion").value.trim(),
+    address: $("#sAddress").value.trim(),
+    inn: $("#sInn").value.trim(),
+    origin_note: $("#sOrigin").value.trim(),
+    certificate_label: $("#sCert").value.trim(),
+    fragrances_offered: $("#sFragrances").value.trim(),
+    notes: $("#sNotes").value.trim(),
+    has_quality_certificate: $("#sCertOk").checked,
+    honest_sign: $("#sHonestSign").checked,
+    active: $("#sActive").checked,
+  };
+  const editId = $("#editSupplierId").value;
+  try {
+    if (editId) {
+      await api(`/api/admin/suppliers/${editId}`, { method: "PUT", body: JSON.stringify(body) });
+    } else {
+      await api("/api/admin/suppliers", { method: "POST", body: JSON.stringify(body) });
+    }
+    showToast("Сохранено");
+    $("#supplierModal").close();
+    await loadSuppliers();
+  } catch (err) {
+    showToast(err.message);
+  }
+});
+
+$("#supplierModalCancel").addEventListener("click", () => $("#supplierModal").close());
+$("#newSupplierBtn").addEventListener("click", () => openSupplierModal(true));
 
 async function loadOrders(status = "") {
   const q = status ? `?status=${encodeURIComponent(status)}` : "";
@@ -267,10 +399,11 @@ document.querySelectorAll(".admin-tabs__btn").forEach((btn) => {
     document.querySelectorAll(".admin-tabs__btn").forEach((b) =>
       b.classList.toggle("admin-tabs__btn--active", b === btn)
     );
-    ["products", "orders", "admins"].forEach((t) => {
+    ["products", "suppliers", "orders", "admins"].forEach((t) => {
       $(`#tab-${t}`).classList.toggle("hidden", btn.dataset.tab !== t);
     });
     if (btn.dataset.tab === "orders") loadOrders($("#orderStatusFilter").value);
+    if (btn.dataset.tab === "suppliers") loadSuppliers();
   });
 });
 
@@ -278,6 +411,7 @@ async function init() {
   if (tg) { tg.ready(); tg.expand(); }
   document.documentElement.dataset.theme = localStorage.getItem("sv_theme") || "dark";
   if (!(await checkAccess())) return;
+  await loadSuppliers();
   await loadProducts();
   await loadAdmins();
 }

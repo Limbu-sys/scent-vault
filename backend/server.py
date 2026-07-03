@@ -112,6 +112,8 @@ class ProductIn(BaseModel):
     description: str = ""
     stock_ml: int = Field(default=100, ge=0)
     active: bool = True
+    supplier_id: str | None = None
+    fragrance_family: str = ""
 
 
 class ProductUpdate(BaseModel):
@@ -126,6 +128,54 @@ class ProductUpdate(BaseModel):
     image_url: str | None = None
     description: str | None = None
     stock_ml: int | None = Field(default=None, ge=0)
+    active: bool | None = None
+    supplier_id: str | None = None
+    fragrance_family: str | None = None
+
+
+class SupplierIn(BaseModel):
+    name: str = Field(min_length=1)
+    country: str = ""
+    region: str = ""
+    origin_type: str = "oil_concentrate"
+    origin_note: str = ""
+    has_quality_certificate: bool = False
+    certificate_label: str = ""
+    honest_sign: bool = False
+    honest_sign_note: str = ""
+    contact_email: str = ""
+    contact_person: str = ""
+    phone: str = ""
+    telegram: str = ""
+    whatsapp: str = ""
+    website: str = ""
+    inn: str = ""
+    address: str = ""
+    notes: str = ""
+    fragrances_offered: str = ""
+    active: bool = True
+
+
+class SupplierUpdate(BaseModel):
+    name: str | None = None
+    country: str | None = None
+    region: str | None = None
+    origin_type: str | None = None
+    origin_note: str | None = None
+    has_quality_certificate: bool | None = None
+    certificate_label: str | None = None
+    honest_sign: bool | None = None
+    honest_sign_note: str | None = None
+    contact_email: str | None = None
+    contact_person: str | None = None
+    phone: str | None = None
+    telegram: str | None = None
+    whatsapp: str | None = None
+    website: str | None = None
+    inn: str | None = None
+    address: str | None = None
+    notes: str | None = None
+    fragrances_offered: str | None = None
     active: bool | None = None
 
 
@@ -197,7 +247,16 @@ def legal_api():
 
 @app.get("/api/suppliers")
 def list_suppliers_public():
-    return {"items": get_db().list_suppliers(active_only=True)}
+    items = []
+    for s in get_db().list_suppliers(active_only=True):
+        items.append({
+            "id": s["id"],
+            "name": s["name"],
+            "country": s.get("country", ""),
+            "has_quality_certificate": s.get("has_quality_certificate"),
+            "honest_sign": s.get("honest_sign"),
+        })
+    return {"items": items}
 
 
 @app.get("/api/suppliers/{supplier_id}")
@@ -299,6 +358,41 @@ def admin_reseed_catalog(request: Request):
 def admin_list_suppliers(request: Request):
     require_admin(request)
     return {"items": get_db().list_suppliers(active_only=False)}
+
+
+@app.post("/api/admin/suppliers")
+def admin_create_supplier(body: SupplierIn, request: Request):
+    require_admin(request)
+    try:
+        return get_db().create_supplier(body.model_dump())
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.put("/api/admin/suppliers/{supplier_id}")
+def admin_update_supplier(supplier_id: str, body: SupplierUpdate, request: Request):
+    require_admin(request)
+    data = {k: v for k, v in body.model_dump().items() if v is not None}
+    try:
+        return get_db().update_supplier(supplier_id, data)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.delete("/api/admin/suppliers/{supplier_id}")
+def admin_delete_supplier(supplier_id: str, request: Request):
+    require_admin(request)
+    try:
+        get_db().delete_supplier(supplier_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return {"ok": True}
+
+
+@app.get("/api/admin/suppliers/{supplier_id}/products")
+def admin_supplier_products(supplier_id: str, request: Request):
+    require_admin(request)
+    return {"items": get_db().list_products_for_supplier(supplier_id)}
 
 
 @app.get("/api/admin/products")

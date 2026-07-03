@@ -12,7 +12,13 @@ from pathlib import Path
 from typing import Any, Iterator
 
 from catalog import enrich_product
-from suppliers import CATALOG_SEED, CATALOG_SEED_VERSION, SEED_PRODUCTS, SEED_SUPPLIERS
+from suppliers import (
+    CATALOG_SEED,
+    CATALOG_SEED_VERSION,
+    PLACEHOLDER_SUPPLIER_IDS,
+    SEED_PRODUCTS,
+    SEED_SUPPLIERS,
+)
 from config import ADMIN_TELEGRAM_IDS, DATA_DIR, DB_PATH, TRIBUTE_SHOP_URL
 
 PRODUCTS_JSON = DATA_DIR / "products.json"
@@ -57,7 +63,9 @@ class Database:
         self.path = path
         self._init_schema()
         self._ensure_product_columns()
+        self._ensure_supplier_columns()
         self._seed_suppliers()
+        self._remove_placeholder_suppliers()
         self._migrate_json_if_needed()
         self._sync_catalog_seed_if_needed()
 
@@ -172,45 +180,93 @@ class Database:
             if "fragrance_family" not in cols:
                 conn.execute("ALTER TABLE products ADD COLUMN fragrance_family TEXT NOT NULL DEFAULT ''")
 
+    def _ensure_supplier_columns(self) -> None:
+        with self._conn() as conn:
+            cols = {r[1] for r in conn.execute("PRAGMA table_info(suppliers)")}
+            extra = {
+                "contact_person": "TEXT NOT NULL DEFAULT ''",
+                "phone": "TEXT NOT NULL DEFAULT ''",
+                "telegram": "TEXT NOT NULL DEFAULT ''",
+                "whatsapp": "TEXT NOT NULL DEFAULT ''",
+                "website": "TEXT NOT NULL DEFAULT ''",
+                "inn": "TEXT NOT NULL DEFAULT ''",
+                "address": "TEXT NOT NULL DEFAULT ''",
+                "notes": "TEXT NOT NULL DEFAULT ''",
+                "fragrances_offered": "TEXT NOT NULL DEFAULT ''",
+            }
+            for col, typedef in extra.items():
+                if col not in cols:
+                    conn.execute(f"ALTER TABLE suppliers ADD COLUMN {col} {typedef}")
+
+    def _remove_placeholder_suppliers(self) -> None:
+        if not PLACEHOLDER_SUPPLIER_IDS:
+            return
+        placeholders = list(PLACEHOLDER_SUPPLIER_IDS)
+        qs = ",".join("?" * len(placeholders))
+        with self._conn() as conn:
+            conn.execute(
+                f"UPDATE products SET supplier_id = NULL WHERE supplier_id IN ({qs})",
+                placeholders,
+            )
+            conn.execute(f"DELETE FROM suppliers WHERE id IN ({qs})", placeholders)
+
     def _seed_suppliers(self) -> None:
+        if not SEED_SUPPLIERS:
+            return
         now = _utc_now()
         with self._conn() as conn:
             for s in SEED_SUPPLIERS:
-                conn.execute(
-                    """
-                    INSERT INTO suppliers (
-                        id, name, country, region, origin_type, origin_note,
-                        has_quality_certificate, certificate_label,
-                        honest_sign, honest_sign_note, contact_email,
-                        active, created_at, updated_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    ON CONFLICT(id) DO UPDATE SET
-                        name=excluded.name, country=excluded.country, region=excluded.region,
-                        origin_type=excluded.origin_type, origin_note=excluded.origin_note,
-                        has_quality_certificate=excluded.has_quality_certificate,
-                        certificate_label=excluded.certificate_label,
-                        honest_sign=excluded.honest_sign,
-                        honest_sign_note=excluded.honest_sign_note,
-                        contact_email=excluded.contact_email,
-                        active=excluded.active, updated_at=excluded.updated_at
-                    """,
-                    (
-                        s["id"],
-                        s["name"],
-                        s.get("country", ""),
-                        s.get("region", ""),
-                        s.get("origin_type", "oil_concentrate"),
-                        s.get("origin_note", ""),
-                        1 if s.get("has_quality_certificate") else 0,
-                        s.get("certificate_label", ""),
-                        1 if s.get("honest_sign") else 0,
-                        s.get("honest_sign_note", ""),
-                        s.get("contact_email", ""),
-                        1 if s.get("active", True) else 0,
-                        now,
-                        now,
-                    ),
-                )
+                self._insert_supplier_row(conn, s, now)
+
+    def _insert_supplier_row(self, conn: sqlite3.Connection, s: dict, now: str) -> None:
+        conn.execute(
+            """
+            INSERT INTO suppliers (
+                id, name, country, region, origin_type, origin_note,
+                has_quality_certificate, certificate_label,
+                honest_sign, honest_sign_note, contact_email,
+                contact_person, phone, telegram, whatsapp, website,
+                inn, address, notes, fragrances_offered,
+                active, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                name=excluded.name, country=excluded.country, region=excluded.region,
+                origin_type=excluded.origin_type, origin_note=excluded.origin_note,
+                has_quality_certificate=excluded.has_quality_certificate,
+                certificate_label=excluded.certificate_label,
+                honest_sign=excluded.honest_sign, honest_sign_note=excluded.honest_sign_note,
+                contact_email=excluded.contact_email, contact_person=excluded.contact_person,
+                phone=excluded.phone, telegram=excluded.telegram, whatsapp=excluded.whatsapp,
+                website=excluded.website, inn=excluded.inn, address=excluded.address,
+                notes=excluded.notes, fragrances_offered=excluded.fragrances_offered,
+                active=excluded.active, updated_at=excluded.updated_at
+            """,
+            (
+                s["id"],
+                s["name"],
+                s.get("country", ""),
+                s.get("region", ""),
+                s.get("origin_type", "oil_concentrate"),
+                s.get("origin_note", ""),
+                1 if s.get("has_quality_certificate") else 0,
+                s.get("certificate_label", ""),
+                1 if s.get("honest_sign") else 0,
+                s.get("honest_sign_note", ""),
+                s.get("contact_email", ""),
+                s.get("contact_person", ""),
+                s.get("phone", ""),
+                s.get("telegram", ""),
+                s.get("whatsapp", ""),
+                s.get("website", ""),
+                s.get("inn", ""),
+                s.get("address", ""),
+                s.get("notes", ""),
+                s.get("fragrances_offered", ""),
+                1 if s.get("active", True) else 0,
+                now,
+                now,
+            ),
+        )
 
     def _meta_get(self, conn: sqlite3.Connection, key: str) -> str | None:
         row = conn.execute("SELECT value FROM app_meta WHERE key = ?", (key,)).fetchone()
@@ -237,7 +293,7 @@ class Database:
                 notes_json=excluded.notes_json, concentration=excluded.concentration,
                 base_price_per_ml=excluded.base_price_per_ml, badge=excluded.badge,
                 gradient_json=excluded.gradient_json, description=excluded.description,
-                supplier_id=excluded.supplier_id, fragrance_family=excluded.fragrance_family,
+                fragrance_family=excluded.fragrance_family,
                 active=1, updated_at=excluded.updated_at
             """,
             (
@@ -260,6 +316,11 @@ class Database:
                 now,
             ),
         )
+        if raw.get("supplier_id"):
+            conn.execute(
+                "UPDATE products SET supplier_id = ? WHERE id = ?",
+                (raw["supplier_id"], raw["id"]),
+            )
 
     def _sync_catalog_seed_if_needed(self) -> None:
         with self._conn() as conn:
@@ -344,6 +405,12 @@ class Database:
 
     # --- Suppliers ---
 
+    def _enrich_row(self, row: sqlite3.Row) -> dict:
+        product = _row_to_product(row)
+        sid = product.get("supplier_id")
+        supplier = self.get_supplier(sid) if sid else None
+        return enrich_product(product, supplier)
+
     def list_suppliers(self, active_only: bool = True) -> list[dict]:
         sql = "SELECT * FROM suppliers"
         if active_only:
@@ -365,6 +432,47 @@ class Database:
         d["honest_sign"] = bool(d.get("honest_sign"))
         d["active"] = bool(d.get("active", 1))
         return d
+
+    def create_supplier(self, data: dict) -> dict:
+        name = str(data.get("name", "")).strip()
+        if not name:
+            raise ValueError("name_required")
+        sid = data.get("id") or _slugify(name)
+        now = _utc_now()
+        with self._conn() as conn:
+            if conn.execute("SELECT 1 FROM suppliers WHERE id = ?", (sid,)).fetchone():
+                sid = f"{sid}-{uuid.uuid4().hex[:4]}"
+            payload = {"id": sid, "name": name, **data}
+            self._insert_supplier_row(conn, payload, now)
+        return self.get_supplier(sid)  # type: ignore
+
+    def update_supplier(self, supplier_id: str, data: dict) -> dict:
+        existing = self.get_supplier(supplier_id)
+        if not existing:
+            raise ValueError("supplier_not_found")
+        merged = {**existing, **data, "id": supplier_id}
+        now = _utc_now()
+        with self._conn() as conn:
+            self._insert_supplier_row(conn, merged, now)
+        return self.get_supplier(supplier_id)  # type: ignore
+
+    def delete_supplier(self, supplier_id: str) -> None:
+        with self._conn() as conn:
+            conn.execute(
+                "UPDATE products SET supplier_id = NULL WHERE supplier_id = ?",
+                (supplier_id,),
+            )
+            cur = conn.execute("DELETE FROM suppliers WHERE id = ?", (supplier_id,))
+            if cur.rowcount == 0:
+                raise ValueError("supplier_not_found")
+
+    def list_products_for_supplier(self, supplier_id: str) -> list[dict]:
+        with self._conn() as conn:
+            rows = conn.execute(
+                "SELECT * FROM products WHERE supplier_id = ? ORDER BY brand, name",
+                (supplier_id,),
+            ).fetchall()
+        return [self._enrich_row(r) for r in rows]
 
     # --- Products ---
 
@@ -399,19 +507,19 @@ class Database:
         sql += " ORDER BY brand, name"
         with self._conn() as conn:
             rows = conn.execute(sql, params).fetchall()
-        return [enrich_product(_row_to_product(r)) for r in rows]
+        return [self._enrich_row(r) for r in rows]
 
     def list_products_admin(self) -> list[dict]:
         with self._conn() as conn:
             rows = conn.execute("SELECT * FROM products ORDER BY brand, name").fetchall()
-        return [enrich_product(_row_to_product(r)) for r in rows]
+        return [self._enrich_row(r) for r in rows]
 
     def get_product(self, product_id: str) -> dict | None:
         with self._conn() as conn:
             row = conn.execute("SELECT * FROM products WHERE id = ?", (product_id,)).fetchone()
         if not row:
             return None
-        return enrich_product(_row_to_product(row))
+        return self._enrich_row(row)
 
     def create_product(self, data: dict) -> dict:
         brand = str(data.get("brand", "")).strip()

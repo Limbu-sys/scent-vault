@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Admin — Scent Vault</title>
+  <link rel="icon" type="image/svg+xml" href="/assets/icon.svg">
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/admin.css">
+</head>
+<body>
+  <div class="admin-wrap">
+    <header class="admin-header">
+      <a href="/" class="admin-back">← Магазин</a>
+      <h1>Scent Vault Admin</h1>
+    </header>
+    <p class="admin-hint hidden" id="accessDenied">Доступ только для администраторов</p>
+    <div id="adminPanel" class="hidden">
+      <nav class="admin-tabs">
+        <button type="button" class="admin-tabs__btn admin-tabs__btn--active" data-tab="products">Товары</button>
+        <button type="button" class="admin-tabs__btn" data-tab="orders">Заказы</button>
+        <button type="button" class="admin-tabs__btn" data-tab="admins">Админы</button>
+      </nav>
+      <section class="admin-section" id="tab-products">
+        <button type="button" class="btn btn--primary btn--full" id="newProductBtn">+ Новый товар</button>
+        <div class="admin-list" id="productList"></div>
+      </section>
+      <section class="admin-section hidden" id="tab-orders">
+        <select id="orderStatusFilter" class="field-input" style="margin-bottom:12px">
+          <option value="">Все статусы</option>
+          <option value="pending_payment">Ожидает оплаты</option>
+          <option value="paid">Оплачен</option>
+          <option value="processing">Собирается</option>
+          <option value="shipped">Отправлен</option>
+          <option value="delivered">Доставлен</option>
+          <option value="cancelled">Отменён</option>
+        </select>
+        <div class="admin-list" id="orderList"></div>
+      </section>
+      <section class="admin-section hidden" id="tab-admins">
+        <div class="admin-card">
+          <h2>Добавить администратора</h2>
+          <p class="admin-card__hint">Telegram User ID — через @userinfobot</p>
+          <div class="admin-row">
+            <input type="text" class="field-input" id="newAdminId" placeholder="123456789" inputmode="numeric">
+            <button type="button" class="btn btn--primary" id="addAdminBtn">Добавить</button>
+          </div>
+        </div>
+        <div class="admin-list" id="adminList"></div>
+      </section>
+    </div>
+    <dialog class="admin-modal" id="productModal">
+      <form id="productForm" class="admin-modal__inner">
+        <h2 id="modalTitle">Товар</h2>
+        <input type="hidden" id="editProductId">
+        <p class="admin-sku hidden" id="skuDisplay"></p>
+        <label class="field"><span>Бренд</span><input type="text" id="fBrand" required class="field-input"></label>
+        <label class="field"><span>Название</span><input type="text" id="fName" required class="field-input"></label>
+        <label class="field"><span>Описание</span><textarea id="fDesc" class="field-input" rows="2"></textarea></label>
+        <label class="field"><span>Пол</span>
+          <select id="fGender" class="field-input">
+            <option value="female">Женский</option>
+            <option value="male">Мужской</option>
+            <option value="unisex">Унисекс</option>
+          </select>
+        </label>
+        <label class="field"><span>Концентрация</span><input type="text" id="fConc" class="field-input" value="EDP"></label>
+        <label class="field"><span>Цена за 1 мл (₽)</span><input type="number" id="fPrice" required min="1" class="field-input"></label>
+        <label class="field"><span>Остаток (мл)</span><input type="number" id="fStock" min="0" class="field-input" value="100"></label>
+        <label class="field"><span>Фото</span>
+          <input type="file" id="fImage" accept="image/*" class="field-input">
+          <input type="hidden" id="fImageUrl">
+          <img id="fImagePreview" class="admin-preview hidden" alt="">
+        </label>
+        <label class="field"><span>Ноты (через запятую)</span><input type="text" id="fNotes" class="field-input"></label>
+        <label class="field"><span>Бейдж</span>
+          <select id="fBadge" class="field-input">
+            <option value="">—</option>
+            <option value="icon">Икона</option>
+            <option value="bestseller">Хит</option>
+            <option value="premium">Премиум</option>
+          </select>
+        </label>
+        <label class="field"><span>Градиент</span>
+          <div class="admin-row">
+            <input type="color" id="fGrad1" value="#3d2914">
+            <input type="color" id="fGrad2" value="#8b5a2b">
+          </div>
+        </label>
+        <label class="field"><span><input type="checkbox" id="fActive" checked> В продаже</span></label>
+        <div class="admin-modal__actions">
+          <button type="button" class="btn btn--ghost" id="modalCancel">Отмена</button>
+          <button type="submit" class="btn btn--primary">Сохранить</button>
+        </div>
+      </form>
+    </dialog>
+    <div class="toast hidden" id="toast"></div>
+  </div>
+  <script type="module" src="/js/admin.js"></script>
+</body>
+</html>

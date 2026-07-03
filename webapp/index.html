@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#0a0908">
+  <title>Scent Vault</title>
+  <link rel="icon" type="image/svg+xml" href="/assets/icon.svg">
+  <link rel="icon" type="image/png" sizes="512x512" href="/assets/icon-512.png">
+  <link rel="apple-touch-icon" href="/assets/icon-512.png">
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div id="app">
+    <div class="ambient" aria-hidden="true">
+      <div class="ambient__orb ambient__orb--1"></div>
+      <div class="ambient__orb ambient__orb--2"></div>
+      <div class="ambient__grain"></div>
+    </div>
+
+    <header class="topbar">
+      <div class="topbar__brand">
+        <span class="topbar__logo"><img src="/assets/icon-512.png" data-fallback="/assets/icon.svg" width="40" height="40" alt="Scent Vault"></span>
+        <div>
+          <p class="topbar__tag" data-i18n="tagline">Парфюм на розлив</p>
+          <h1 class="topbar__title">Scent Vault</h1>
+        </div>
+      </div>
+      <div class="topbar__actions">
+        <button type="button" class="icon-btn" id="themeToggle" aria-label="Theme">
+          <svg class="icon-sun" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+          <svg class="icon-moon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        </button>
+        <div class="lang-pill" id="langSwitch">
+          <button type="button" class="lang-pill__btn lang-pill__btn--active" data-lang="ru">RU</button>
+          <button type="button" class="lang-pill__btn" data-lang="en">EN</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="main" id="mainScroll">
+      <!-- CATALOG -->
+      <section class="view view--active" id="view-catalog" data-view="catalog">
+        <div class="hero anim-rise">
+          <p class="hero__eyebrow" data-i18n="heroEyebrow">Оригинальные ароматы</p>
+          <h2 class="hero__headline" data-i18n="heroTitle">Известные бренды<br>на розлив</h2>
+          <p class="hero__sub" data-i18n="heroSub">Склад в Краснодаре · Доставка по России</p>
+        </div>
+
+        <div class="search-bar anim-rise anim-delay-1">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3-3"/></svg>
+          <input type="search" id="searchInput" data-i18n-placeholder="searchPlaceholder" placeholder="Поиск аромата или бренда…" autocomplete="off">
+        </div>
+
+        <div class="filters anim-rise anim-delay-2" id="brandFilters"></div>
+
+        <div class="gender-tabs anim-rise anim-delay-2" id="genderTabs">
+          <button type="button" class="gender-tabs__btn gender-tabs__btn--active" data-gender="all" data-i18n="genderAll">Все</button>
+          <button type="button" class="gender-tabs__btn" data-gender="female" data-i18n="genderFemale">Женские</button>
+          <button type="button" class="gender-tabs__btn" data-gender="male" data-i18n="genderMale">Мужские</button>
+          <button type="button" class="gender-tabs__btn" data-gender="unisex" data-i18n="genderUnisex">Унисекс</button>
+        </div>
+
+        <div class="catalog-grid" id="catalogGrid"></div>
+      </section>
+
+      <!-- PRODUCT DETAIL -->
+      <section class="view" id="view-product" data-view="product">
+        <button type="button" class="back-btn" id="productBack">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+          <span data-i18n="back">Назад</span>
+        </button>
+        <div id="productDetail"></div>
+      </section>
+
+      <!-- CART -->
+      <section class="view" id="view-cart" data-view="cart">
+        <h2 class="section-title anim-rise" data-i18n="cartTitle">Корзина</h2>
+        <div id="cartContent"></div>
+        <div class="cart-summary hidden" id="cartSummary">
+          <div class="cart-summary__row">
+            <span data-i18n="subtotal">Товары</span>
+            <span id="cartSubtotal">0 ₽</span>
+          </div>
+          <p class="cart-summary__hint" data-i18n="deliverySeparate">Доставка оплачивается отдельно</p>
+          <button type="button" class="btn btn--primary btn--full" id="checkoutBtn" data-i18n="checkout">Оформить заказ</button>
+        </div>
+      </section>
+
+      <!-- CHECKOUT -->
+      <section class="view" id="view-checkout" data-view="checkout">
+        <button type="button" class="back-btn" id="checkoutBack">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+          <span data-i18n="back">Назад</span>
+        </button>
+        <h2 class="section-title" data-i18n="checkoutTitle">Оформление</h2>
+
+        <form class="checkout-form" id="checkoutForm">
+          <div class="field">
+            <label for="cityInput" data-i18n="city">Город</label>
+            <input type="text" id="cityInput" required autocomplete="address-level2" placeholder="Краснодар">
+          </div>
+          <div class="field">
+            <label for="regionInput" data-i18n="region">Регион / область</label>
+            <input type="text" id="regionInput" autocomplete="address-level1" placeholder="Краснодарский край">
+          </div>
+          <div class="field">
+            <label for="addressInput" data-i18n="address">Адрес</label>
+            <input type="text" id="addressInput" required autocomplete="street-address" placeholder="ул. Красная, 1, кв. 5">
+          </div>
+          <div class="field">
+            <label for="postalInput" data-i18n="postalCode">Индекс</label>
+            <input type="text" id="postalInput" inputmode="numeric" autocomplete="postal-code" placeholder="350000">
+          </div>
+          <div class="field">
+            <label for="commentInput" data-i18n="comment">Комментарий</label>
+            <textarea id="commentInput" rows="2" placeholder=""></textarea>
+          </div>
+
+          <div class="delivery-block">
+            <h3 class="delivery-block__title" data-i18n="deliveryMethod">Способ доставки</h3>
+            <div class="delivery-methods" id="deliveryMethods"></div>
+            <div class="delivery-estimate" id="deliveryEstimate">
+              <div class="delivery-estimate__icon">📦</div>
+              <div>
+                <p class="delivery-estimate__label" data-i18n="deliveryEstimate">Предварительная доставка</p>
+                <p class="delivery-estimate__value" id="deliveryCost">—</p>
+                <p class="delivery-estimate__note" data-i18n="deliveryNote">Точная стоимость — при отправке, оплата отдельно</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="checkout-total">
+            <div class="checkout-total__row">
+              <span data-i18n="orderTotal">К оплате (товары)</span>
+              <span id="checkoutSubtotal">0 ₽</span>
+            </div>
+          </div>
+
+          <button type="submit" class="btn btn--primary btn--full" id="placeOrderBtn" data-i18n="placeOrder">Перейти к оплате</button>
+        </form>
+      </section>
+
+      <!-- ORDER SUCCESS -->
+      <section class="view" id="view-success" data-view="success">
+        <div class="success-card anim-rise">
+          <div class="success-card__icon">✓</div>
+          <h2 data-i18n="orderSuccess">Заказ создан</h2>
+          <p class="success-card__id">#<span id="successOrderId"></span></p>
+          <p class="success-card__text" data-i18n="orderSuccessText">Оплатите товары через Tribute. Доставка — отдельно при отправке.</p>
+          <p class="success-card__hint" id="successPayHint" data-i18n="payHint"></p>
+          <a class="btn btn--primary btn--full hidden" id="successPayBtn" href="#" target="_blank" data-i18n="payNow">Оплатить</a>
+          <button type="button" class="btn btn--primary btn--full" id="successHomeBtn" data-i18n="backToCatalog">В каталог</button>
+        </div>
+      </section>
+
+      <!-- ORDERS -->
+      <section class="view" id="view-orders" data-view="orders">
+        <button type="button" class="back-btn" id="ordersBack">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+          <span data-i18n="back">Назад</span>
+        </button>
+        <h2 class="section-title" data-i18n="myOrders">Мои заказы</h2>
+        <div id="ordersContent"></div>
+      </section>
+
+      <!-- SETTINGS -->
+      <section class="view" id="view-settings" data-view="settings">
+        <h2 class="section-title anim-rise" data-i18n="settingsTitle">Настройки</h2>
+        <div class="settings-list anim-rise">
+          <div class="settings-item">
+            <span data-i18n="theme">Тема</span>
+            <button type="button" class="settings-toggle" id="settingsThemeToggle">
+              <span class="settings-toggle__label" id="themeLabel">Dark</span>
+            </button>
+          </div>
+          <div class="settings-item">
+            <span data-i18n="language">Язык</span>
+            <div class="lang-pill lang-pill--sm" id="settingsLangSwitch">
+              <button type="button" class="lang-pill__btn lang-pill__btn--active" data-lang="ru">RU</button>
+              <button type="button" class="lang-pill__btn" data-lang="en">EN</button>
+            </div>
+          </div>
+          <div class="settings-item settings-item--info">
+            <span data-i18n="warehouse">Склад</span>
+            <span class="settings-item__value" id="warehouseLabel">Краснодар</span>
+          </div>
+          <a href="/admin" class="settings-item settings-item--link hidden" id="adminLink">
+            <span data-i18n="adminPanel">Админ-панель</span>
+            <span>→</span>
+          </a>
+          <button type="button" class="settings-item settings-item--link" id="ordersLink" style="width:100%;border:none;background:none;font:inherit;text-align:left">
+            <span data-i18n="myOrders">Мои заказы</span>
+            <span>→</span>
+          </button>
+          <a href="/legal/offer" class="settings-item settings-item--link" target="_blank">
+            <span data-i18n="offer">Публичная оферта</span>
+            <span>→</span>
+          </a>
+          <a href="/legal/privacy" class="settings-item settings-item--link" target="_blank">
+            <span data-i18n="privacy">Конфиденциальность</span>
+            <span>→</span>
+          </a>
+          <a href="/legal/terms" class="settings-item settings-item--link" target="_blank">
+            <span data-i18n="terms">Соглашение</span>
+            <span>→</span>
+          </a>
+        </div>
+        <p class="settings-footer" data-i18n="aboutText">Scent Vault — оригинальные духи известных брендов на розлив. Все ароматы с официальных флаконов.</p>
+      </section>
+    </main>
+
+    <nav class="tabbar" id="tabbar">
+      <button type="button" class="tabbar__btn tabbar__btn--active" data-tab="catalog">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+        <span data-i18n="tabCatalog">Каталог</span>
+      </button>
+      <button type="button" class="tabbar__btn" data-tab="cart">
+        <span class="tabbar__badge hidden" id="cartBadge">0</span>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 6h15l-1.5 9h-12z"/><circle cx="9" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/><path d="M6 6L5 3H2"/></svg>
+        <span data-i18n="tabCart">Корзина</span>
+      </button>
+      <button type="button" class="tabbar__btn" data-tab="settings">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+        <span data-i18n="tabSettings">Ещё</span>
+      </button>
+    </nav>
+
+    <div class="toast hidden" id="toast"></div>
+
+    <dialog class="legal-modal" id="legalModal">
+      <div class="legal-modal__inner">
+        <h2 data-i18n="legalTitle">Добро пожаловать</h2>
+        <p data-i18n="legalText">Продолжая, вы соглашаетесь с политикой конфиденциальности и пользовательским соглашением.</p>
+        <div class="legal-modal__links">
+          <a href="/legal/offer" target="_blank" data-i18n="offer">Оферта</a>
+          <a href="/legal/privacy" target="_blank" data-i18n="privacy">Конфиденциальность</a>
+          <a href="/legal/terms" target="_blank" data-i18n="terms">Соглашение</a>
+        </div>
+        <button type="button" class="btn btn--primary btn--full" id="legalAccept" data-i18n="legalAccept">Принимаю</button>
+      </div>
+    </dialog>
+  </div>
+
+  <script type="module" src="/js/app.js"></script>
+</body>
+</html>

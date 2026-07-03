@@ -195,6 +195,19 @@ def legal_api():
     }
 
 
+@app.get("/api/suppliers")
+def list_suppliers_public():
+    return {"items": get_db().list_suppliers(active_only=True)}
+
+
+@app.get("/api/suppliers/{supplier_id}")
+def supplier_detail(supplier_id: str):
+    item = get_db().get_supplier(supplier_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Supplier not found")
+    return item
+
+
 @app.get("/api/catalog")
 def catalog(brand: str | None = None, gender: str | None = None, q: str | None = None):
     return {"items": get_db().list_products(brand=brand, gender=gender, q=q)}
@@ -275,6 +288,18 @@ async def create_order(body: OrderIn, request: Request):
 
 
 # --- Admin ---
+
+@app.post("/api/admin/catalog/reseed")
+def admin_reseed_catalog(request: Request):
+    require_admin(request)
+    return get_db().import_catalog_seed(deactivate_others=True)
+
+
+@app.get("/api/admin/suppliers")
+def admin_list_suppliers(request: Request):
+    require_admin(request)
+    return {"items": get_db().list_suppliers(active_only=False)}
+
 
 @app.get("/api/admin/products")
 def admin_list_products(request: Request):

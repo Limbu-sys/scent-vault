@@ -140,6 +140,7 @@ export function renderCatalogGrid(container, list, onProductClick, onFavoriteTog
         <p class="product-card__sku">${p.sku || ""}</p>
         <p class="product-card__brand">${p.brand}</p>
         <h3 class="product-card__name">${p.name}</h3>
+        ${p.fragrance_family ? `<p class="product-card__family">${p.fragrance_family}</p>` : ""}
         <div class="product-card__meta">
           <span class="product-card__conc">${p.concentration}</span>
           <span class="product-card__price">${t("from")} ${formatPrice(minPrice(p))} <small>/ 1${t("perMl")}</small></span>
@@ -178,7 +179,9 @@ export function renderProductDetail(container, product, state, handlers) {
       <p class="product-hero__sku">${product.sku || ""}</p>
       <p class="product-hero__brand">${product.brand}</p>
       <h2 class="product-hero__name">${product.name}</h2>
-      <p class="product-hero__conc">${product.concentration} · ${t(`gender_${product.gender}`)} · ${product.stock_ml ?? 0} ${t("perMl")} ${t("inStock")}</p>
+      <p class="product-hero__conc">${product.concentration} · ${t(`gender_${product.gender}`)}${product.fragrance_family ? ` · ${product.fragrance_family}` : ""}</p>
+      <p class="product-hero__conc product-hero__stock">${product.stock_ml ?? 0} ${t("perMl")} ${t("inStock")}</p>
+      ${product.supplier?.honest_sign ? `<p class="product-hero__cert">✓ ${t("honestSign")} · ${product.supplier.country}</p>` : ""}
       ${product.description ? `<p class="product-hero__desc">${product.description}</p>` : ""}
       <div class="notes-row">
         ${product.notes.map((n) => `<span class="note-tag">${n}</span>`).join("")}

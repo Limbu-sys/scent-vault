@@ -11,7 +11,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterator
 
-from catalog import SEED_PRODUCTS, VOLUMES_ML, VOLUME_MULTIPLIERS, enrich_product
+from catalog import enrich_product
+from suppliers import CATALOG_SEED, CATALOG_SEED_VERSION, SEED_PRODUCTS, SEED_SUPPLIERS
 from config import ADMIN_TELEGRAM_IDS, DATA_DIR, DB_PATH, TRIBUTE_SHOP_URL
 
 PRODUCTS_JSON = DATA_DIR / "products.json"
@@ -55,7 +56,10 @@ class Database:
         path.parent.mkdir(parents=True, exist_ok=True)
         self.path = path
         self._init_schema()
+        self._ensure_product_columns()
+        self._seed_suppliers()
         self._migrate_json_if_needed()
+        self._sync_catalog_seed_if_needed()
 
     @contextmanager
     def _conn(self) -> Iterator[sqlite3.Connection]:
@@ -130,6 +134,28 @@ class Database:
 
                 CREATE INDEX IF NOT EXISTS idx_orders_user ON orders(telegram_user_id);
                 CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
+
+                CREATE TABLE IF NOT EXISTS suppliers (
+                    id TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    country TEXT NOT NULL DEFAULT '',
+                    region TEXT NOT NULL DEFAULT '',
+                    origin_type TEXT NOT NULL DEFAULT 'oil_concentrate',
+                    origin_note TEXT NOT NULL DEFAULT '',
+                    has_quality_certificate INTEGER NOT NULL DEFAULT 0,
+                    certificate_label TEXT NOT NULL DEFAULT '',
+                    honest_sign INTEGER NOT NULL DEFAULT 0,
+                    honest_sign_note TEXT NOT NULL DEFAULT '',
+                    contact_email TEXT NOT NULL DEFAULT '',
+                    active INTEGER NOT NULL DEFAULT 1,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );
+
+                CREATE TABLE IF NOT EXISTS app_meta (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL
+                );
                 """
             )
             for aid in ADMIN_TELEGRAM_IDS:
@@ -137,6 +163,136 @@ class Database:
                     "INSERT OR IGNORE INTO admins (telegram_id, added_at) VALUES (?, ?)",
                     (aid, _utc_now()),
                 )
+
+    def _ensure_product_columns(self) -> None:
+        with self._conn() as conn:
+            cols = {r[1] for r in conn.execute("PRAGMA table_info(products)")}
+            if "supplier_id" not in cols:
+                conn.execute("ALTER TABLE products ADD COLUMN supplier_id TEXT")
+            if "fragrance_family" not in cols:
+                conn.execute("ALTER TABLE products ADD COLUMN fragrance_family TEXT NOT NULL DEFAULT ''")
+
+    def _seed_suppliers(self) -> None:
+        now = _utc_now()
+        with self._conn() as conn:
+            for s in SEED_SUPPLIERS:
+                conn.execute(
+                    """
+                    INSERT INTO suppliers (
+                        id, name, country, region, origin_type, origin_note,
+                        has_quality_certificate, certificate_label,
+                        honest_sign, honest_sign_note, contact_email,
+                        active, created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(id) DO UPDATE SET
+                        name=excluded.name, country=excluded.country, region=excluded.region,
+                        origin_type=excluded.origin_type, origin_note=excluded.origin_note,
+                        has_quality_certificate=excluded.has_quality_certificate,
+                        certificate_label=excluded.certificate_label,
+                        honest_sign=excluded.honest_sign,
+                        honest_sign_note=excluded.honest_sign_note,
+                        contact_email=excluded.contact_email,
+                        active=excluded.active, updated_at=excluded.updated_at
+                    """,
+                    (
+                        s["id"],
+                        s["name"],
+                        s.get("country", ""),
+                        s.get("region", ""),
+                        s.get("origin_type", "oil_concentrate"),
+                        s.get("origin_note", ""),
+                        1 if s.get("has_quality_certificate") else 0,
+                        s.get("certificate_label", ""),
+                        1 if s.get("honest_sign") else 0,
+                        s.get("honest_sign_note", ""),
+                        s.get("contact_email", ""),
+                        1 if s.get("active", True) else 0,
+                        now,
+                        now,
+                    ),
+                )
+
+    def _meta_get(self, conn: sqlite3.Connection, key: str) -> str | None:
+        row = conn.execute("SELECT value FROM app_meta WHERE key = ?", (key,)).fetchone()
+        return row[0] if row else None
+
+    def _meta_set(self, conn: sqlite3.Connection, key: str, value: str) -> None:
+        conn.execute(
+            "INSERT INTO app_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+            (key, value),
+        )
+
+    def _upsert_catalog_item(self, conn: sqlite3.Connection, raw: dict, now: str) -> None:
+        existing = conn.execute("SELECT sku FROM products WHERE id = ?", (raw["id"],)).fetchone()
+        sku = existing[0] if existing else (raw.get("sku") or _next_sku(conn))
+        conn.execute(
+            """
+            INSERT INTO products (
+                id, sku, brand, name, gender, notes_json, concentration,
+                base_price_per_ml, badge, gradient_json, image_url, description,
+                stock_ml, active, supplier_id, fragrance_family, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                brand=excluded.brand, name=excluded.name, gender=excluded.gender,
+                notes_json=excluded.notes_json, concentration=excluded.concentration,
+                base_price_per_ml=excluded.base_price_per_ml, badge=excluded.badge,
+                gradient_json=excluded.gradient_json, description=excluded.description,
+                supplier_id=excluded.supplier_id, fragrance_family=excluded.fragrance_family,
+                active=1, updated_at=excluded.updated_at
+            """,
+            (
+                raw["id"],
+                sku,
+                raw["brand"],
+                raw["name"],
+                raw.get("gender", "unisex"),
+                json.dumps(raw.get("notes", []), ensure_ascii=False),
+                raw.get("concentration", "Extrait Oil"),
+                raw["base_price_per_ml"],
+                raw.get("badge"),
+                json.dumps(raw.get("gradient", ["#3d2914", "#8b5a2b"])),
+                raw.get("image_url", ""),
+                raw.get("description", ""),
+                raw.get("stock_ml", 150),
+                raw.get("supplier_id"),
+                raw.get("fragrance_family", ""),
+                now,
+                now,
+            ),
+        )
+
+    def _sync_catalog_seed_if_needed(self) -> None:
+        with self._conn() as conn:
+            ver = self._meta_get(conn, "catalog_seed_version")
+            if ver and int(ver) >= CATALOG_SEED_VERSION:
+                return
+            now = _utc_now()
+            seed_ids = {p["id"] for p in CATALOG_SEED}
+            for raw in CATALOG_SEED:
+                self._upsert_catalog_item(conn, raw, now)
+            conn.execute(
+                "UPDATE products SET active = 0 WHERE id NOT IN ({})".format(
+                    ",".join("?" * len(seed_ids))
+                ),
+                list(seed_ids),
+            )
+            self._meta_set(conn, "catalog_seed_version", str(CATALOG_SEED_VERSION))
+
+    def import_catalog_seed(self, deactivate_others: bool = True) -> dict:
+        now = _utc_now()
+        with self._conn() as conn:
+            for raw in CATALOG_SEED:
+                self._upsert_catalog_item(conn, raw, now)
+            if deactivate_others:
+                seed_ids = {p["id"] for p in CATALOG_SEED}
+                conn.execute(
+                    "UPDATE products SET active = 0 WHERE id NOT IN ({})".format(
+                        ",".join("?" * len(seed_ids))
+                    ),
+                    list(seed_ids),
+                )
+            self._meta_set(conn, "catalog_seed_version", str(CATALOG_SEED_VERSION))
+        return {"ok": True, "count": len(CATALOG_SEED), "version": CATALOG_SEED_VERSION}
 
     def _migrate_json_if_needed(self) -> None:
         with self._conn() as conn:
@@ -153,33 +309,8 @@ class Database:
                 items = [dict(p) for p in SEED_PRODUCTS]
             now = _utc_now()
             for raw in items:
-                sku = raw.get("sku") or _next_sku(conn)
-                conn.execute(
-                    """
-                    INSERT INTO products (
-                        id, sku, brand, name, gender, notes_json, concentration,
-                        base_price_per_ml, badge, gradient_json, image_url, description,
-                        stock_ml, active, created_at, updated_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
-                    """,
-                    (
-                        raw["id"],
-                        sku,
-                        raw["brand"],
-                        raw["name"],
-                        raw.get("gender", "unisex"),
-                        json.dumps(raw.get("notes", []), ensure_ascii=False),
-                        raw.get("concentration", "EDP"),
-                        raw["base_price_per_ml"],
-                        raw.get("badge"),
-                        json.dumps(raw.get("gradient", ["#3d2914", "#8b5a2b"])),
-                        raw.get("image_url", ""),
-                        raw.get("description", ""),
-                        raw.get("stock_ml", 100),
-                        now,
-                        now,
-                    ),
-                )
+                self._upsert_catalog_item(conn, dict(raw), now)
+            self._meta_set(conn, "catalog_seed_version", str(CATALOG_SEED_VERSION))
 
     # --- Admins ---
 
@@ -210,6 +341,30 @@ class Database:
             cur = conn.execute("DELETE FROM admins WHERE telegram_id = ?", (tid,))
             if cur.rowcount == 0:
                 raise ValueError("not_admin")
+
+    # --- Suppliers ---
+
+    def list_suppliers(self, active_only: bool = True) -> list[dict]:
+        sql = "SELECT * FROM suppliers"
+        if active_only:
+            sql += " WHERE active = 1"
+        sql += " ORDER BY country, name"
+        with self._conn() as conn:
+            rows = conn.execute(sql).fetchall()
+        return [self._row_to_supplier(r) for r in rows]
+
+    def get_supplier(self, supplier_id: str) -> dict | None:
+        with self._conn() as conn:
+            row = conn.execute("SELECT * FROM suppliers WHERE id = ?", (supplier_id,)).fetchone()
+        return self._row_to_supplier(row) if row else None
+
+    @staticmethod
+    def _row_to_supplier(row: sqlite3.Row) -> dict:
+        d = dict(row)
+        d["has_quality_certificate"] = bool(d.get("has_quality_certificate"))
+        d["honest_sign"] = bool(d.get("honest_sign"))
+        d["active"] = bool(d.get("active", 1))
+        return d
 
     # --- Products ---
 
@@ -274,8 +429,8 @@ class Database:
                 INSERT INTO products (
                     id, sku, brand, name, gender, notes_json, concentration,
                     base_price_per_ml, badge, gradient_json, image_url, description,
-                    stock_ml, active, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    stock_ml, active, supplier_id, fragrance_family, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     pid,
@@ -284,7 +439,7 @@ class Database:
                     name,
                     data.get("gender", "unisex"),
                     json.dumps(data.get("notes", []), ensure_ascii=False),
-                    data.get("concentration", "EDP"),
+                    data.get("concentration", "Extrait Oil"),
                     float(data["base_price_per_ml"]),
                     data.get("badge"),
                     json.dumps(data.get("gradient", ["#3d2914", "#8b5a2b"])),
@@ -292,6 +447,8 @@ class Database:
                     data.get("description", ""),
                     int(data.get("stock_ml", 100)),
                     1 if data.get("active", True) else 0,
+                    data.get("supplier_id"),
+                    data.get("fragrance_family", ""),
                     now,
                     now,
                 ),
@@ -310,7 +467,8 @@ class Database:
                 UPDATE products SET
                     brand=?, name=?, gender=?, notes_json=?, concentration=?,
                     base_price_per_ml=?, badge=?, gradient_json=?, image_url=?,
-                    description=?, stock_ml=?, active=?, updated_at=?
+                    description=?, stock_ml=?, active=?, supplier_id=?,
+                    fragrance_family=?, updated_at=?
                 WHERE id=?
                 """,
                 (
@@ -318,7 +476,7 @@ class Database:
                     merged["name"],
                     merged["gender"],
                     json.dumps(merged.get("notes", []), ensure_ascii=False),
-                    merged.get("concentration", "EDP"),
+                    merged.get("concentration", "Extrait Oil"),
                     float(merged["base_price_per_ml"]),
                     merged.get("badge"),
                     json.dumps(merged.get("gradient", ["#3d2914", "#8b5a2b"])),
@@ -326,6 +484,8 @@ class Database:
                     merged.get("description", ""),
                     int(merged.get("stock_ml", 100)),
                     1 if merged.get("active", True) else 0,
+                    merged.get("supplier_id"),
+                    merged.get("fragrance_family", ""),
                     now,
                     product_id,
                 ),

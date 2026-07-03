@@ -33,6 +33,7 @@ from config import (
 from db import ORDER_STATUSES, get_db
 from delivery import DELIVERY_METHODS, estimate_delivery, list_methods
 from notify import notify_admins_new_order, notify_user_order_status
+from telegram_setup import setup_telegram_mini_app
 from tribute import process_tribute_webhook, verify_tribute_signature
 
 WEBAPP_DIR = ROOT / "webapp"
@@ -67,6 +68,7 @@ def _render_legal(page: str) -> str:
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     get_db()
+    await setup_telegram_mini_app()
     yield
 
 

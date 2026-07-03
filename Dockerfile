@@ -10,10 +10,12 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY backend/ ./backend/
 COPY webapp/ ./webapp/
 COPY config.example.env .
+COPY start.sh /app/start.sh
 
 ENV DATA_DIR=/data
 ENV PORT=80
 EXPOSE 80
 
 WORKDIR /app/backend
-CMD sh -c "python bot.py & exec uvicorn server:app --host 0.0.0.0 --port ${PORT:-80}"
+RUN chmod +x /app/start.sh
+CMD ["/app/start.sh"]

@@ -4,20 +4,29 @@ from __future__ import annotations
 
 import logging
 
-from telegram import BotCommand, InlineKeyboardButton, InlineKeyboardMarkup, MenuButtonWebApp, Update, WebAppInfo
+from telegram import (
+    BotCommand,
+    KeyboardButton,
+    ReplyKeyboardMarkup,
+    Update,
+    WebAppInfo,
+)
 from telegram.ext import Application, CommandHandler, ContextTypes
 
 from config import APP_PUBLIC_URL, TELEGRAM_BOT_TOKEN, WAREHOUSE_CITY
+from telegram_setup import setup_telegram_mini_app
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("scent-vault-bot")
 
 
-def _keyboard() -> InlineKeyboardMarkup | None:
+def _keyboard() -> ReplyKeyboardMarkup | None:
     if not APP_PUBLIC_URL:
         return None
-    return InlineKeyboardMarkup(
-        [[InlineKeyboardButton("🛍 Открыть магазин", web_app=WebAppInfo(url=APP_PUBLIC_URL))]]
+    return ReplyKeyboardMarkup(
+        [[KeyboardButton("🛍 Открыть магазин", web_app=WebAppInfo(url=APP_PUBLIC_URL))]],
+        resize_keyboard=True,
+        is_persistent=True,
     )
 
 
@@ -29,7 +38,8 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "Оригинальные ароматы с официальных флаконов.\n"
         f"📍 Склад: {WAREHOUSE_CITY}\n"
         "🚚 Доставка по России\n\n"
-        "Нажмите кнопку меню слева от поля ввода или кнопку ниже."
+        "Нажмите кнопку <b>«🛍 Открыть магазин»</b> ниже\n"
+        "или кнопку меню слева от поля ввода."
     )
     await update.message.reply_html(text, reply_markup=_keyboard())
 
@@ -39,16 +49,7 @@ async def post_init(application: Application) -> None:
     await bot.set_my_commands([
         BotCommand("start", "Открыть магазин"),
     ])
-    if APP_PUBLIC_URL:
-        await bot.set_chat_menu_button(
-            menu_button=MenuButtonWebApp(
-                text="🛍 Магазин",
-                web_app=WebAppInfo(url=APP_PUBLIC_URL),
-            )
-        )
-        log.info("Menu button → %s", APP_PUBLIC_URL)
-    else:
-        log.warning("APP_PUBLIC_URL not set — menu button skipped")
+    await setup_telegram_mini_app()
 
 
 def run_bot() -> None:

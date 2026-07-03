@@ -486,7 +486,7 @@ function bindEvents() {
   }
 
   if (!localStorage.getItem("sv_legal_ok")) {
-    $("#legalModal")?.showModal();
+    requestAnimationFrame(() => $("#legalModal")?.showModal());
   }
   $("#legalAccept")?.addEventListener("click", () => {
     localStorage.setItem("sv_legal_ok", "1");
@@ -540,6 +540,10 @@ async function init() {
         if (me.is_admin) $("#adminLink")?.classList.remove("hidden");
       }
     } catch { /* ignore */ }
+
+    // fallback: show admin if Telegram user id matches (when /api/me unavailable)
+    const tgUid = String(tg?.initDataUnsafe?.user?.id || "");
+    if (tgUid === "122429011") $("#adminLink")?.classList.remove("hidden");
   } catch (err) {
     console.error(err);
     $("#catalogGrid").innerHTML = `<p class="cart-empty">${t("loadError")}</p>`;

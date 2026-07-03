@@ -193,6 +193,7 @@ def legal_api():
     }
 
 
+@app.get("/api/catalog")
 def catalog(brand: str | None = None, gender: str | None = None, q: str | None = None):
     return {"items": get_db().list_products(brand=brand, gender=gender, q=q)}
 

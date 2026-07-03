@@ -1305,21 +1305,42 @@ html, body {
   border: none;
   padding: 0;
   background: transparent;
-  max-width: calc(100% - 32px);
-  width: 400px;
+  color: var(--text);
+  max-width: min(400px, calc(100vw - 32px));
+  width: 100%;
+  margin: 0;
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
 }
 
-.legal-modal::backdrop { background: rgba(0,0,0,0.7); }
+.legal-modal::backdrop { background: rgba(0, 0, 0, 0.75); }
 
 .legal-modal__inner {
   padding: 24px;
   border-radius: var(--radius);
   background: var(--bg-elevated);
   border: 1px solid var(--border);
+  color: var(--text);
+  box-shadow: var(--shadow);
 }
 
-.legal-modal__inner h2 { margin-bottom: 12px; font-family: var(--font-display); }
-.legal-modal__links { display: flex; gap: 16px; margin: 16px 0; }
-.legal-modal__links a { color: var(--gold); font-size: 14px; }
+.legal-modal__inner h2 {
+  margin-bottom: 12px;
+  font-family: var(--font-display);
+  color: var(--text);
+  font-size: 1.5rem;
+}
+
+.legal-modal__inner p {
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1.6;
+  margin-bottom: 12px;
+}
+
+.legal-modal__links { display: flex; flex-wrap: wrap; gap: 12px 16px; margin: 16px 0; }
+.legal-modal__links a { color: var(--gold); font-size: 14px; text-decoration: underline; }
 
 .admin-preview { max-width: 120px; margin-top: 8px; border-radius: 8px; }

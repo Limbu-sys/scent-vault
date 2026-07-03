@@ -22,6 +22,7 @@ APP_PUBLIC_URL = os.getenv("APP_PUBLIC_URL", "").rstrip("/")
 TRIBUTE_API_KEY = os.getenv("TRIBUTE_API_KEY", "")
 TRIBUTE_SHOP_URL = os.getenv("TRIBUTE_SHOP_URL", "")
 WAREHOUSE_CITY = os.getenv("WAREHOUSE_CITY", "Краснодар")
+DGIS_API_KEY = os.getenv("DGIS_API_KEY", "")
 
 LEGAL_SELF_EMPLOYED_NAME = os.getenv("LEGAL_SELF_EMPLOYED_NAME", "")
 LEGAL_INN = os.getenv("LEGAL_INN", "")

@@ -312,6 +312,75 @@ $("#supplierForm").addEventListener("submit", async (e) => {
 $("#supplierModalCancel").addEventListener("click", () => $("#supplierModal").close());
 $("#newSupplierBtn").addEventListener("click", () => openSupplierModal(true));
 
+let dgisPreviewItems = [];
+
+function renderDgisResults(items) {
+  const box = $("#dgisResults");
+  dgisPreviewItems = items || [];
+  $("#dgisImportBtn").disabled = !dgisPreviewItems.length;
+  if (!dgisPreviewItems.length) {
+    box.innerHTML = "<p class='admin-card__hint'>Нажмите «Найти» — покажем компании из 2GIS</p>";
+    return;
+  }
+  box.innerHTML = dgisPreviewItems
+    .map(
+      (it, idx) => `
+    <label class="admin-item admin-item--check">
+      <input type="checkbox" class="dgis-pick" data-idx="${idx}" ${it.already_imported ? "" : "checked"}>
+      <div class="admin-item__info">
+        <div class="admin-item__title">${it.name}${it.already_imported ? " · уже в базе" : ""}</div>
+        <div class="admin-item__meta">${it.address || "—"}</div>
+        <div class="admin-item__meta">${[it.phone, it.contact_email, it.website].filter(Boolean).join(" · ") || "контакты в 2GIS"}</div>
+        <div class="admin-item__meta"><a href="${it.link}" target="_blank" rel="noopener">Открыть в 2GIS</a> · запрос: ${it.query || "—"}</div>
+      </div>
+    </label>`
+    )
+    .join("");
+}
+
+async function dgisSearch(dryRun = true, importSelected = false) {
+  const queries = $("#dgisQueries").value
+    .split("\n")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const body = {
+    city: $("#dgisCity").value,
+    queries,
+    dry_run: dryRun,
+    skip_existing: true,
+    dgis_ids: [],
+  };
+  if (importSelected) {
+    body.dry_run = false;
+    body.dgis_ids = [...document.querySelectorAll(".dgis-pick:checked")]
+      .map((el) => dgisPreviewItems[Number(el.dataset.idx)]?.dgis_id)
+      .filter(Boolean);
+    if (!body.dgis_ids.length) {
+      showToast("Выберите компании для импорта");
+      return;
+    }
+  }
+  try {
+    const data = await api("/api/admin/suppliers/import-2gis", {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+    if (data.dry_run) {
+      renderDgisResults(data.items || []);
+      showToast(`Найдено: ${data.total}`);
+    } else {
+      showToast(`Импорт: +${(data.created || []).length}, обновлено ${(data.updated || []).length}`);
+      await loadSuppliers();
+      renderDgisResults(data.items || []);
+    }
+  } catch (e) {
+    showToast(e.message);
+  }
+}
+
+$("#dgisPreviewBtn")?.addEventListener("click", () => dgisSearch(true));
+$("#dgisImportBtn")?.addEventListener("click", () => dgisSearch(false, true));
+
 async function loadOrders(status = "") {
   const q = status ? `?status=${encodeURIComponent(status)}` : "";
   const data = await api(`/api/admin/orders${q}`);

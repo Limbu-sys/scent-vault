@@ -20,6 +20,7 @@ from catalog import VOLUMES_ML
 from config import (
     APP_PUBLIC_URL,
     DATA_DIR,
+    DGIS_API_KEY,
     LEGAL_ADDRESS,
     LEGAL_CONTACT_EMAIL,
     LEGAL_INN,
@@ -32,6 +33,7 @@ from config import (
 )
 from db import ORDER_STATUSES, get_db
 from delivery import DELIVERY_METHODS, estimate_delivery, list_methods
+from dgis import CITY_PRESETS, DEFAULT_QUERIES, DgisError, collect_leads
 from notify import notify_admins_new_order, notify_user_order_status
 from telegram_setup import setup_telegram_mini_app
 from tribute import process_tribute_webhook, verify_tribute_signature
@@ -177,6 +179,15 @@ class SupplierUpdate(BaseModel):
     notes: str | None = None
     fragrances_offered: str | None = None
     active: bool | None = None
+
+
+class DgisImportIn(BaseModel):
+    city: str = "krasnodar"
+    queries: list[str] = Field(default_factory=lambda: list(DEFAULT_QUERIES))
+    page_size: int = Field(default=10, ge=1, le=10)
+    dry_run: bool = True
+    skip_existing: bool = True
+    dgis_ids: list[str] = Field(default_factory=list)
 
 
 class AdminIn(BaseModel):
@@ -393,6 +404,67 @@ def admin_delete_supplier(supplier_id: str, request: Request):
 def admin_supplier_products(supplier_id: str, request: Request):
     require_admin(request)
     return {"items": get_db().list_products_for_supplier(supplier_id)}
+
+
+@app.get("/api/admin/2gis/status")
+def admin_2gis_status(request: Request):
+    require_admin(request)
+    return {
+        "configured": bool((DGIS_API_KEY or "").strip()),
+        "cities": {k: v["label"] for k, v in CITY_PRESETS.items()},
+        "default_queries": list(DEFAULT_QUERIES),
+    }
+
+
+@app.post("/api/admin/suppliers/import-2gis")
+def admin_import_2gis(body: DgisImportIn, request: Request):
+    require_admin(request)
+    preset = CITY_PRESETS.get(body.city) or CITY_PRESETS["krasnodar"]
+    lat = float(preset["lat"])  # type: ignore[arg-type]
+    lon = float(preset["lon"])  # type: ignore[arg-type]
+    city_label = str(preset["label"])
+    try:
+        leads = collect_leads(
+            body.queries,
+            lat=lat,
+            lon=lon,
+            city_label=city_label,
+            page_size=body.page_size,
+        )
+    except DgisError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    if body.dgis_ids:
+        allowed = set(body.dgis_ids)
+        leads = [l for l in leads if l.get("dgis_id") in allowed]
+
+    preview = [
+        {
+            "dgis_id": l.get("dgis_id"),
+            "name": l.get("name"),
+            "address": l.get("address"),
+            "phone": l.get("phone"),
+            "contact_email": l.get("contact_email"),
+            "website": l.get("website"),
+            "link": l.get("_2gis_link"),
+            "query": l.get("_query"),
+            "has_contacts": l.get("_has_contacts"),
+            "already_imported": bool(get_db().get_supplier_by_dgis_id(l.get("dgis_id") or "")),
+        }
+        for l in leads
+    ]
+
+    if body.dry_run:
+        return {"dry_run": True, "city": city_label, "total": len(preview), "items": preview}
+
+    result = get_db().import_dgis_leads(leads, skip_existing=body.skip_existing)
+    return {
+        "dry_run": False,
+        "city": city_label,
+        "total": len(preview),
+        "items": preview,
+        **result,
+    }
 
 
 @app.get("/api/admin/products")

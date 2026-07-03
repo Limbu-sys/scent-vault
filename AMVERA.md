@@ -81,6 +81,7 @@ git push -u origin main
 | `PORT` | `80` |
 | `WAREHOUSE_CITY` | `Краснодар` |
 | `LEGAL_CONTACT_EMAIL` | `dvetochkiinfo@gmail.com` |
+| `DGIS_API_KEY` | *(опционально)* ключ 2GIS для обновления базы поставщиков в админке |
 
 **После первого деплоя** добавьте:
 

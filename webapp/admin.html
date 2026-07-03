@@ -29,6 +29,28 @@
         <div class="admin-list" id="productList"></div>
       </section>
       <section class="admin-section hidden" id="tab-suppliers">
+        <div class="admin-card" id="dgisImportCard">
+          <h2>Импорт из 2GIS</h2>
+          <p class="admin-card__hint">Поиск оптовиков и арomatovary по городу. Телефоны — если ключ API с правом contact_groups.</p>
+          <label class="field"><span>Город</span>
+            <select id="dgisCity" class="field-input">
+              <option value="krasnodar">Краснодар</option>
+              <option value="moscow">Москва</option>
+              <option value="spb">Санкт-Петербург</option>
+            </select>
+          </label>
+          <label class="field"><span>Запросы (по одному в строке)</span>
+            <textarea id="dgisQueries" class="field-input" rows="4">парфюмерия опт
+арomatovary
+отдушки
+парфюмерное сырье</textarea>
+          </label>
+          <div class="admin-row">
+            <button type="button" class="btn btn--ghost" id="dgisPreviewBtn">Найти</button>
+            <button type="button" class="btn btn--primary" id="dgisImportBtn" disabled>Импортировать выбранные</button>
+          </div>
+          <div class="admin-list" id="dgisResults"></div>
+        </div>
         <button type="button" class="btn btn--primary btn--full" id="newSupplierBtn">+ Новый поставщик</button>
         <div class="admin-list" id="supplierList"></div>
       </section>

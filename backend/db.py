@@ -22,6 +22,8 @@ from suppliers import (
 from config import ADMIN_TELEGRAM_IDS, DATA_DIR, DB_PATH, TRIBUTE_SHOP_URL
 
 PRODUCTS_JSON = DATA_DIR / "products.json"
+SUPPLIERS_SEED_FILE = Path(__file__).resolve().parent / "suppliers_seed.json"
+SUPPLIERS_SEED_VERSION = "1"
 ORDER_STATUSES = ("pending_payment", "paid", "processing", "shipped", "delivered", "cancelled")
 
 
@@ -65,6 +67,7 @@ class Database:
         self._ensure_product_columns()
         self._ensure_supplier_columns()
         self._seed_suppliers()
+        self._seed_dgis_suppliers()
         self._remove_placeholder_suppliers()
         self._migrate_json_if_needed()
         self._sync_catalog_seed_if_needed()
@@ -193,6 +196,7 @@ class Database:
                 "address": "TEXT NOT NULL DEFAULT ''",
                 "notes": "TEXT NOT NULL DEFAULT ''",
                 "fragrances_offered": "TEXT NOT NULL DEFAULT ''",
+                "dgis_id": "TEXT NOT NULL DEFAULT ''",
             }
             for col, typedef in extra.items():
                 if col not in cols:
@@ -218,6 +222,23 @@ class Database:
             for s in SEED_SUPPLIERS:
                 self._insert_supplier_row(conn, s, now)
 
+    def _seed_dgis_suppliers(self) -> None:
+        """Загружает поставщиков из suppliers_seed.json (2GIS, Краснодар)."""
+        if not SUPPLIERS_SEED_FILE.is_file():
+            return
+        with self._conn() as conn:
+            if self._meta_get(conn, "suppliers_seed_version") == SUPPLIERS_SEED_VERSION:
+                return
+        try:
+            data = json.loads(SUPPLIERS_SEED_FILE.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return
+        items = data.get("items") or []
+        if items:
+            self.import_dgis_leads(items, skip_existing=True)
+        with self._conn() as conn:
+            self._meta_set(conn, "suppliers_seed_version", SUPPLIERS_SEED_VERSION)
+
     def _insert_supplier_row(self, conn: sqlite3.Connection, s: dict, now: str) -> None:
         conn.execute(
             """
@@ -226,9 +247,9 @@ class Database:
                 has_quality_certificate, certificate_label,
                 honest_sign, honest_sign_note, contact_email,
                 contact_person, phone, telegram, whatsapp, website,
-                inn, address, notes, fragrances_offered,
+                inn, address, notes, fragrances_offered, dgis_id,
                 active, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET
                 name=excluded.name, country=excluded.country, region=excluded.region,
                 origin_type=excluded.origin_type, origin_note=excluded.origin_note,
@@ -239,6 +260,7 @@ class Database:
                 phone=excluded.phone, telegram=excluded.telegram, whatsapp=excluded.whatsapp,
                 website=excluded.website, inn=excluded.inn, address=excluded.address,
                 notes=excluded.notes, fragrances_offered=excluded.fragrances_offered,
+                dgis_id=excluded.dgis_id,
                 active=excluded.active, updated_at=excluded.updated_at
             """,
             (
@@ -262,6 +284,7 @@ class Database:
                 s.get("address", ""),
                 s.get("notes", ""),
                 s.get("fragrances_offered", ""),
+                s.get("dgis_id", ""),
                 1 if s.get("active", True) else 0,
                 now,
                 now,
@@ -465,6 +488,75 @@ class Database:
             cur = conn.execute("DELETE FROM suppliers WHERE id = ?", (supplier_id,))
             if cur.rowcount == 0:
                 raise ValueError("supplier_not_found")
+
+    def get_supplier_by_dgis_id(self, dgis_id: str) -> dict | None:
+        if not dgis_id:
+            return None
+        with self._conn() as conn:
+            row = conn.execute(
+                "SELECT * FROM suppliers WHERE dgis_id = ? LIMIT 1",
+                (dgis_id,),
+            ).fetchone()
+        return self._row_to_supplier(row) if row else None
+
+    def import_dgis_leads(
+        self,
+        leads: list[dict],
+        *,
+        skip_existing: bool = True,
+    ) -> dict[str, Any]:
+        """Импорт черновиков из 2GIS в таблицу suppliers."""
+        created: list[str] = []
+        updated: list[str] = []
+        skipped: list[str] = []
+        for lead in leads:
+            dgis_id = str(lead.get("dgis_id") or "").strip()
+            name = str(lead.get("name") or "").strip()
+            if not name:
+                continue
+            existing = self.get_supplier_by_dgis_id(dgis_id) if dgis_id else None
+            if existing and skip_existing:
+                skipped.append(existing["id"])
+                continue
+            payload = {
+                k: v
+                for k, v in lead.items()
+                if not k.startswith("_") and k in {
+                    "id",
+                    "name",
+                    "country",
+                    "region",
+                    "origin_type",
+                    "origin_note",
+                    "has_quality_certificate",
+                    "certificate_label",
+                    "honest_sign",
+                    "honest_sign_note",
+                    "contact_email",
+                    "contact_person",
+                    "phone",
+                    "telegram",
+                    "whatsapp",
+                    "website",
+                    "inn",
+                    "address",
+                    "notes",
+                    "fragrances_offered",
+                    "dgis_id",
+                    "active",
+                }
+            }
+            if existing:
+                payload["id"] = existing["id"]
+                self.update_supplier(existing["id"], payload)
+                updated.append(existing["id"])
+            else:
+                sid = payload.get("id") or f"dgis-{dgis_id}" if dgis_id else None
+                if sid:
+                    payload["id"] = sid
+                row = self.create_supplier(payload)
+                created.append(row["id"])
+        return {"created": created, "updated": updated, "skipped": skipped}
 
     def list_products_for_supplier(self, supplier_id: str) -> list[dict]:
         with self._conn() as conn:

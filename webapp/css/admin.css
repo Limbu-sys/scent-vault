@@ -113,6 +113,13 @@
 
 .admin-item__actions .btn-del { color: var(--danger); border-color: rgba(224, 112, 112, 0.4); }
 
+.admin-item--check {
+  cursor: pointer;
+  align-items: flex-start;
+  gap: 10px;
+}
+.admin-item--check input { margin-top: 4px; flex-shrink: 0; }
+
 .admin-modal {
   border: none;
   padding: 0;
